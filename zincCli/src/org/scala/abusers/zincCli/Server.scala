@@ -1,0 +1,53 @@
+package org.scala.abusers
+package zincCli
+
+import cats.effect.*
+import cats.syntax.all.*
+import jsonrpclib.fs2.*
+import jsonrpclib.fs2.FS2Channel
+import jsonrpclib.smithy4sinterop.ServerEndpoints
+
+object ZincCli extends IOApp {
+
+  override def run(args: List[String]): IO[ExitCode] = {
+    val app = for {
+      fs2Channel           <- FS2Channel.resource[IO](cancelTemplate = None)
+      server               <- IO(ZincCliServer()).toResource
+      serverEndpoints      <- ServerEndpoints(server).liftTo[IO].toResource
+      channelWithEndpoints <- fs2Channel.withEndpoints(serverEndpoints)
+      _ <- fs2.Stream
+        .never[IO]
+        .concurrently(
+          // STDIN
+          fs2.io
+            .stdin[IO](512)
+            .through(jsonrpclib.fs2.lsp.decodeMessages)
+            .through(channelWithEndpoints.inputOrBounce)
+        )
+        .concurrently(
+          // STDOUT
+          channelWithEndpoints.output
+            .through(jsonrpclib.fs2.lsp.encodeMessages[IO])
+            .through(fs2.io.stdout[IO])
+        )
+        .compile
+        .drain
+        .toResource
+    } yield ()
+
+    app.useForever.as(ExitCode.Success)
+  }
+}
+
+class ZincCliServer extends csp.CspServer[IO] {
+
+  override def compile(
+      classpath: List[String],
+      sourcePath: List[String],
+      scalacOptions: List[String],
+      javacOptions: List[String],
+      scalaVersion: csp.ScalaVersion,
+  ): IO[csp.CompileOutput] =
+    ???
+
+}
