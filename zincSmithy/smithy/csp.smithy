@@ -5,12 +5,13 @@ namespace org.scala.abusers.csp
 
 use jsonrpclib#jsonRpc
 use jsonrpclib#jsonRpcRequest
+use jsonrpclib#jsonRpcNotification
 use jsonrpclib#jsonRpcPayload
 
 @jsonRpc
 service CspClient {
   operations: [
-    Compile
+
   ]
 }
 
@@ -27,7 +28,39 @@ operation Compile {
   output: CompileOutput
 }
 
+@jsonRpcNotification("logMessage")
+operation onLogMessage {
+    input := {
+        @jsonRpcPayload
+        @required
+        params: String
+    }
+    output: Unit
+}
+
+@jsonRpcNotification("publishDiagnostics")
+operation onPublishDiagnostics {
+    input := {
+        @jsonRpcPayload
+        @required
+        params: String
+    }
+    output: Unit
+}
+
+@jsonRpcNotification("taskProgress")
+operation onTaskProgress {
+    input := {
+        @jsonRpcPayload
+        @required
+        params: String
+    }
+    output: Unit
+}
+
 structure CompileParams {
+  @required
+  scopeId: String
   @required
   classpath: Classpath
   @required
